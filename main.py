@@ -2,6 +2,8 @@
 import requests
 import pandas as pd
 import duckdb
+import os
+from dotenv import load_dotenv
 
 def extract_energy_charts_data(country_code="it"):
     print(f"Downloading energy data for: {country_code.upper()}...")
@@ -42,7 +44,7 @@ if energy_df is not None:
     print("Connecting to DuckDB...")
     
     # Crea un file fisico chiamato 'energy_project.duckdb' nel tuo computer
-    conn = duckdb.connect('energy_project.duckdb')
+    conn = duckdb.connect('md:my_db?motherduck_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImNocmlzdGlhbmdyYXNzbzY1QGdtYWlsLmNvbSIsIm1kUmVnaW9uIjoiYXdzLWV1LWNlbnRyYWwtMSIsInNlc3Npb24iOiJjaHJpc3RpYW5ncmFzc282NS5nbWFpbC5jb20iLCJwYXQiOiI3NVYxOENvd0ZRcWhmRENlRTVTSjN4MnRfQVNXZVpXSDFDQWpYWUhjOFBJIiwidXNlcklkIjoiYmRmYTY1ZGEtMjdlZi00NTZlLWE5NWItMTE5NDdjNGUzYzkyIiwiaXNzIjoibWRfcGF0IiwicmVhZE9ubHkiOmZhbHNlLCJ0b2tlblR5cGUiOiJyZWFkX3dyaXRlIiwiaWF0IjoxNzg3MTU5NDA3fQ.FKYwNEV4kj0hsysGJFDz688j0ZGiUHaVRTaqxGSm2WU')
     
     # DuckDB legge la variabile 'energy_df' automaticamente.
     # Usiamo "CREATE OR REPLACE TABLE" per aggiornare i dati se esegui lo script più volte
@@ -52,3 +54,13 @@ if energy_df is not None:
     conn.close()
     
     print("Load successful! Data saved into the DuckDB database 'energy_project.duckdb'.")
+
+
+# Apri la cassaforte virtuale
+load_dotenv()
+
+# Prendi il token segreto
+token = os.getenv("MOTHERDUCK_TOKEN")
+
+# Connettiti a MotherDuck usando il token appena letto
+conn = duckdb.connect(f'md:my_db?motherduck_token={token}')

@@ -1,6 +1,6 @@
 # Ambienti virtuali
 venv/
-env/
+.env
 
 # Database locali
 *.duckdb
