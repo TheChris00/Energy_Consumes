@@ -1,0 +1,34 @@
+name: Aggiornamento Dati Energia
+
+# Quando deve attivarsi il robot?
+on:
+  schedule:
+    # Si attiva al minuto 0 e 30 di ogni ora (es. 10:00, 10:30, 11:00...)
+    - cron: '0,30 * * * *'
+  # Permette di premere il tasto "Play" anche manualmente dal sito di GitHub
+  workflow_dispatch: 
+
+jobs:
+  estrai-e-salva:
+    # Accendi un computer Linux gratuito fornito da GitHub
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 1. Scarica il codice del nostro progetto
+      uses: actions/checkout@v3
+
+    - name: 2. Installa Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 3. Installa le librerie (Pandas, DuckDB, ecc.)
+      run: |
+        pip install -r requirements.txt
+
+    - name: 4. Esegui l'estrazione dati
+      # Prendi la password segreta dalla cassaforte e passala allo script
+      env:
+        MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
+      run: |
+        python main.py
