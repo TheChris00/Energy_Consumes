@@ -1,0 +1,12 @@
+# Ambienti virtuali
+venv/
+env/
+
+# Database locali
+*.duckdb
+*.db
+*.sqlite
+
+# File di sistema Mac e cache di Python
+.DS_Store
+__pycache__/
