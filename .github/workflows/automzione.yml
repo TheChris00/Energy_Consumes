@@ -6,21 +6,23 @@ on:
     # Si attiva al minuto 0 e 30 di ogni ora (es. 10:00, 10:30, 11:00...)
     - cron: '0,30 * * * *'
   # Permette di premere il tasto "Play" anche manualmente dal sito di GitHub
-  workflow_dispatch: 
+  workflow_dispatch:
 
 jobs:
   estrai-e-salva:
     # Accendi un computer Linux gratuito fornito da GitHub
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
     - name: 1. Scarica il codice del nostro progetto
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: 2. Installa Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
+        cache: 'pip'
 
     - name: 3. Installa le librerie (Pandas, DuckDB, ecc.)
       run: |
@@ -31,4 +33,8 @@ jobs:
       env:
         MOTHERDUCK_TOKEN: ${{ secrets.MOTHERDUCK_TOKEN }}
       run: |
+        if [ -z "$MOTHERDUCK_TOKEN" ]; then
+          echo "::error::Il secret MOTHERDUCK_TOKEN non e' configurato nel repository."
+          exit 1
+        fi
         python main.py

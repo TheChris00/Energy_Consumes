@@ -1,66 +1,113 @@
+"""Pipeline ETL: energy-charts.info -> DuckDB (locale o MotherDuck)."""
 
-import requests
-import pandas as pd
-import duckdb
 import os
+
+import duckdb
+import pandas as pd
+import requests
 from dotenv import load_dotenv
+
+load_dotenv()
+
+API_URL = "https://api.energy-charts.info/public_power"
+TABLE_NAME = "italy_power_production"
+LOCAL_DB = "energy_project.duckdb"
+REQUEST_TIMEOUT = 30
+
+
+def get_connection():
+    """Apre MotherDuck se il token e' disponibile, altrimenti il file locale."""
+    token = os.getenv("MOTHERDUCK_TOKEN")
+    if token:
+        print("Connecting to MotherDuck (md:my_db)...")
+        return duckdb.connect(f"md:my_db?motherduck_token={token}")
+
+    print(f"MOTHERDUCK_TOKEN not set: using the local database '{LOCAL_DB}'.")
+    return duckdb.connect(LOCAL_DB)
+
 
 def extract_energy_charts_data(country_code="it"):
     print(f"Downloading energy data for: {country_code.upper()}...")
-    url = f"https://api.energy-charts.info/public_power?country={country_code}"
-    
+
     # API Call
-    response = requests.get(url)
-    if response.status_code != 200:
-        print("Error: Failed to download data from the API.")
-        return None
-        
+    response = requests.get(
+        API_URL, params={"country": country_code}, timeout=REQUEST_TIMEOUT
+    )
+    response.raise_for_status()
+
     json_data = response.json()
-    
+
     # Extract and convert timestamps
-    timestamps = json_data['unix_seconds']
-    utc_dates = pd.to_datetime(timestamps, unit='s', utc=True)
-    local_dates = utc_dates.tz_convert('Europe/Rome')
-    
+    timestamps = json_data["unix_seconds"]
+    utc_dates = pd.to_datetime(timestamps, unit="s", utc=True)
+    local_dates = utc_dates.tz_convert("Europe/Rome")
+
     # Create DataFrame (We keep Datetime as a standard column for DuckDB)
-    df = pd.DataFrame({'Datetime': local_dates})
-    
+    df = pd.DataFrame({"Datetime": local_dates})
+
     # Add columns dynamically
-    for source in json_data['production_types']:
-        source_name = source['name']
-        values = source['data']
+    for source in json_data["production_types"]:
+        source_name = source["name"]
+        values = source["data"]
+        if len(values) != len(df):
+            raise ValueError(
+                f"Series '{source_name}' has {len(values)} values "
+                f"but there are {len(df)} timestamps."
+            )
         df[source_name] = values
-        
+
     return df
 
-# --- Pipeline Execution ---
-# 1. Extract
-energy_df = extract_energy_charts_data("it")
 
-if energy_df is not None:
-    print("\nExtraction successful!")
-    
-    # 2. Load (Salvataggio nel Database DuckDB)
-    print("Connecting to DuckDB...")
-    
-    # Crea un file fisico chiamato 'energy_project.duckdb' nel tuo computer
-    conn = duckdb.connect('md:my_db?motherduck_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImNocmlzdGlhbmdyYXNzbzY1QGdtYWlsLmNvbSIsIm1kUmVnaW9uIjoiYXdzLWV1LWNlbnRyYWwtMSIsInNlc3Npb24iOiJjaHJpc3RpYW5ncmFzc282NS5nbWFpbC5jb20iLCJwYXQiOiI3NVYxOENvd0ZRcWhmRENlRTVTSjN4MnRfQVNXZVpXSDFDQWpYWUhjOFBJIiwidXNlcklkIjoiYmRmYTY1ZGEtMjdlZi00NTZlLWE5NWItMTE5NDdjNGUzYzkyIiwiaXNzIjoibWRfcGF0IiwicmVhZE9ubHkiOmZhbHNlLCJ0b2tlblR5cGUiOiJyZWFkX3dyaXRlIiwiaWF0IjoxNzg3MTU5NDA3fQ.FKYwNEV4kj0hsysGJFDz688j0ZGiUHaVRTaqxGSm2WU')
-    
-    # DuckDB legge la variabile 'energy_df' automaticamente.
-    # Usiamo "CREATE OR REPLACE TABLE" per aggiornare i dati se esegui lo script più volte
-    conn.execute("CREATE OR REPLACE TABLE italy_power_production AS SELECT * FROM energy_df")
-    
-    # Chiudiamo la connessione
-    conn.close()
-    
-    print("Load successful! Data saved into the DuckDB database 'energy_project.duckdb'.")
+def load_to_duckdb(conn, df):
+    """Aggiunge i dati nuovi senza cancellare lo storico gia' salvato."""
+    conn.register("energy_df", df)
+
+    # Prima esecuzione: crea la tabella vuota con lo schema del DataFrame
+    conn.execute(
+        f"CREATE TABLE IF NOT EXISTS {TABLE_NAME} AS "
+        "SELECT * FROM energy_df WHERE FALSE"
+    )
+
+    # Se l'API aggiunge una nuova fonte di produzione, allarga la tabella
+    existing = {
+        row[0] for row in conn.execute(f"DESCRIBE {TABLE_NAME}").fetchall()
+    }
+    for column in df.columns:
+        if column not in existing:
+            print(f"New column detected: '{column}' - adding it to the table.")
+            conn.execute(
+                f'ALTER TABLE {TABLE_NAME} ADD COLUMN "{column}" DOUBLE'
+            )
+
+    columns = ", ".join(f'"{column}"' for column in df.columns)
+
+    # Upsert: i timestamp gia' presenti vengono riscritti (l'API rivede i dati
+    # piu' recenti), tutto il resto dello storico resta intatto.
+    conn.execute(
+        f'DELETE FROM {TABLE_NAME} '
+        f'WHERE "Datetime" IN (SELECT "Datetime" FROM energy_df)'
+    )
+    conn.execute(
+        f"INSERT INTO {TABLE_NAME} ({columns}) SELECT {columns} FROM energy_df"
+    )
+
+    total = conn.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}").fetchone()[0]
+    print(f"Load successful! {len(df)} rows written, {total} rows in total.")
 
 
-# Apri la cassaforte virtuale
-load_dotenv()
+def main():
+    # 1. Extract
+    energy_df = extract_energy_charts_data("it")
+    print(f"\nExtraction successful! {len(energy_df)} rows downloaded.")
 
-# Prendi il token segreto
-token = os.getenv("MOTHERDUCK_TOKEN")
+    # 2. Load
+    conn = get_connection()
+    try:
+        load_to_duckdb(conn, energy_df)
+    finally:
+        conn.close()
 
-# Connettiti a MotherDuck usando il token appena letto
-conn = duckdb.connect(f'md:my_db?motherduck_token={token}')
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,17 @@
+# Ambiente virtuale
+venv/
+.venv/
+
+# Segreti
+.env
+
+# Database locali DuckDB
+*.duckdb
+*.duckdb.wal
+
+# Python
+__pycache__/
+*.py[cod]
+
+# macOS
+.DS_Store

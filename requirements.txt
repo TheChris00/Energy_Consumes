@@ -2,4 +2,5 @@ pandas
 requests
 duckdb
 python-dotenv
-schedule
+pytz
+streamlit
