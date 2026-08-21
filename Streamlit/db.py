@@ -33,13 +33,34 @@ def _somma(colonne):
     return " + ".join(f'COALESCE("{c}", 0)' for c in colonne)
 
 
+def _token():
+    """Il token puo' arrivare da due posti a seconda di dove gira l'app:
+    in locale dal .env, su Streamlit Community Cloud dai secrets.
+    """
+    token = os.getenv("MOTHERDUCK_TOKEN")
+    if token:
+        return token
+    try:
+        return st.secrets["MOTHERDUCK_TOKEN"]
+    except Exception:
+        # Nessun file secrets configurato: normale in locale
+        return None
+
+
 @st.cache_resource
 def get_conn():
     """Una sola connessione per tutta la sessione (non ad ogni click)."""
-    token = os.getenv("MOTHERDUCK_TOKEN")
+    token = _token()
     if token:
         return duckdb.connect(f"md:my_db?motherduck_token={token}")
-    return duckdb.connect(str(LOCAL_DB), read_only=True)
+    if LOCAL_DB.exists():
+        return duckdb.connect(str(LOCAL_DB), read_only=True)
+    st.error(
+        "Nessuna sorgente dati disponibile: manca MOTHERDUCK_TOKEN "
+        "(in .env se sei in locale, nei Secrets se sei su Streamlit Cloud) "
+        "e non c'e' nemmeno il database locale."
+    )
+    st.stop()
 
 
 def _query(sql, params=None):
