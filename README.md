@@ -7,7 +7,7 @@ minutes into DuckDB / MotherDuck, and answers three questions through a Streamli
 - **Consumption** — when does demand peak, and how do weekends differ from weekdays?
 - **Energy security** — how much do we import, and what keeps the lights on when solar drops to zero?
 
-> **Live dashboard:** _coming soon_ · _(screenshot: `docs/dashboard.png`)_
+> **Live dashboard:** https://energyconsumes-ezcyeswldexjrwzhsqznts.streamlit.app
 
 ## Architecture
 
