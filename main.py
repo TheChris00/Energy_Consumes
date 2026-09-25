@@ -1,13 +1,8 @@
-"""Pipeline ETL: energy-charts.info -> DuckDB (locale o MotherDuck)."""
-
-import os
+"""Pipeline ETL: energy-charts.info -> DuckDB (file locale, versionato su GitHub)."""
 
 import duckdb
 import pandas as pd
 import requests
-from dotenv import load_dotenv
-
-load_dotenv()
 
 API_URL = "https://api.energy-charts.info/public_power"
 TABLE_NAME = "italy_power_production"
@@ -16,13 +11,8 @@ REQUEST_TIMEOUT = 30
 
 
 def get_connection():
-    """Apre MotherDuck se il token e' disponibile, altrimenti il file locale."""
-    token = os.getenv("MOTHERDUCK_TOKEN")
-    if token:
-        print("Connecting to MotherDuck (md:my_db)...")
-        return duckdb.connect(f"md:my_db?motherduck_token={token}")
-
-    print(f"MOTHERDUCK_TOKEN not set: using the local database '{LOCAL_DB}'.")
+    """Apre il file DuckDB locale (viene salvato nel repo dal workflow)."""
+    print(f"Using the local database '{LOCAL_DB}'.")
     return duckdb.connect(LOCAL_DB)
 
 

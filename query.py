@@ -1,4 +1,4 @@
-"""Query di esplorazione e analisi sul database prodotto da main.py."""
+# Query di esplorazione e analisi sul database prodotto da main.py.
 
 import pandas as pd
 
@@ -8,7 +8,7 @@ from main import TABLE_NAME, get_connection
 pd.set_option("display.max_columns", None)
 pd.set_option("display.width", 2000)
 
-# 1. Apriamo il database (lo stesso usato dalla pipeline: MotherDuck o locale)
+# 1. Apriamo il database locale (lo stesso usato dalla pipeline)
 conn = get_connection()
 
 print("Exploring the database...\n")

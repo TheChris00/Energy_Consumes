@@ -5,6 +5,9 @@ venv/
 # Segreti
 .env
 
+# Database locali DuckDB
+*.duckdb
+*.duckdb.wal
 
 # Python
 __pycache__/
